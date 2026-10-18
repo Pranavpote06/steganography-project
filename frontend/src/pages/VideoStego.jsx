@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import FileDropzone from '../components/FileDropzone';
 import CapacityMeter from '../components/CapacityMeter';
-import { getVideoCapacity, embedVideo } from '../api';
+import { getVideoCapacity, embedVideo, API_BASE_URL } from '../api';
 
 export default function VideoStego({ showToast, onOperationComplete }) {
   // Carrier State
@@ -469,7 +469,7 @@ export default function VideoStego({ showToast, onOperationComplete }) {
             <span className="text-xs font-semibold text-slate-300 block">Generated Stego Video Playback:</span>
             <video
               controls
-              src={`/api/video/download/${stegoResult.download_id}`}
+              src={`${API_BASE_URL}/api/video/download/${stegoResult.download_id}`}
               className="w-full max-h-80 rounded-lg bg-black"
             />
             <p className="text-[11px] text-slate-400 italic">
@@ -499,7 +499,7 @@ export default function VideoStego({ showToast, onOperationComplete }) {
 
           {/* Direct Download Button */}
           <a
-            href={`/api/video/download/${stegoResult.download_id}`}
+            href={`${API_BASE_URL}/api/video/download/${stegoResult.download_id}`}
             download={stegoResult.filename}
             className="w-full py-4 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 shadow-glow-purple transition-all flex items-center justify-center gap-2"
           >

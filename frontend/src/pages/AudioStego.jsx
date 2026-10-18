@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import FileDropzone from '../components/FileDropzone';
 import CapacityMeter from '../components/CapacityMeter';
-import { getAudioCapacity, embedAudio } from '../api';
+import { getAudioCapacity, embedAudio, API_BASE_URL } from '../api';
 
 export default function AudioStego({ showToast, onOperationComplete }) {
   // Carrier State
@@ -474,7 +474,7 @@ export default function AudioStego({ showToast, onOperationComplete }) {
             <span className="text-xs font-semibold text-slate-300 block">Generated Stego Audio Playback:</span>
             <audio
               controls
-              src={`/api/audio/download/${stegoResult.download_id}`}
+              src={`${API_BASE_URL}/api/audio/download/${stegoResult.download_id}`}
               className="w-full h-10 rounded-lg"
             />
             <p className="text-[11px] text-slate-400 italic">
@@ -504,7 +504,7 @@ export default function AudioStego({ showToast, onOperationComplete }) {
 
           {/* Direct Download Button */}
           <a
-            href={`/api/audio/download/${stegoResult.download_id}`}
+            href={`${API_BASE_URL}/api/audio/download/${stegoResult.download_id}`}
             download={stegoResult.filename}
             className="w-full py-4 rounded-xl text-sm font-bold text-slate-900 bg-cyan-400 hover:bg-cyan-300 shadow-glow-cyan transition-all flex items-center justify-center gap-2"
           >
