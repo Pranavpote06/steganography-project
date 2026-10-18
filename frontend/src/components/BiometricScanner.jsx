@@ -6,7 +6,6 @@ import {
   XCircle, 
   ShieldAlert, 
   ShieldCheck, 
-  Upload, 
   X, 
   Eye, 
   Smile, 
@@ -18,7 +17,6 @@ import { detectFace } from '../api';
 
 export default function BiometricScanner({ onCapture, onCancel, capturedImage, setCapturedImage }) {
   const videoRef = useRef(null);
-  const fileInputRef = useRef(null);
   const streamRef = useRef(null);
   const trackingIntervalRef = useRef(null);
   const isCheckingRef = useRef(false);
@@ -60,7 +58,7 @@ export default function BiometricScanner({ onCapture, onCancel, capturedImage, s
 
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("Camera API is not supported in this browser. Please use photo upload.");
+        throw new Error("Camera API is not supported in this browser.");
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -89,7 +87,7 @@ export default function BiometricScanner({ onCapture, onCancel, capturedImage, s
       }
     } catch (err) {
       console.warn("Webcam access error:", err);
-      setCameraError(err.message || "Camera access denied. Please allow camera permissions or upload a photo.");
+      setCameraError(err.message || "Camera access denied. Please allow camera permissions to continue.");
       setCameraActive(false);
     }
   };
@@ -262,33 +260,6 @@ export default function BiometricScanner({ onCapture, onCancel, capturedImage, s
     }
   };
 
-  const handleFileUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const b64 = reader.result;
-      try {
-        const res = await detectFace(b64);
-        if (!res.has_face) {
-          alert("Photo Rejected: No human face detected in the uploaded image. The person must be clearly visible.");
-          return;
-        }
-        if (!res.is_valid || !res.is_unmasked) {
-          alert(`Photo Rejected: ${res.message || 'Both eyes, nose, and lips must be visible without a mask.'}`);
-          return;
-        }
-        stopCamera();
-        setCapturedImage(b64);
-        if (onCapture) onCapture(b64);
-      } catch (err) {
-        alert("Photo Verification Failed: Could not process face scan.");
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-
   const handleRetake = () => {
     setCapturedImage(null);
     setIsFaceReady(false);
@@ -315,16 +286,6 @@ export default function BiometricScanner({ onCapture, onCancel, capturedImage, s
           </button>
         )}
       </div>
-
-      {/* Hidden File Input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        capture="user"
-        onChange={handleFileUpload}
-        className="hidden"
-      />
 
       {/* Camera Viewport / Captured Preview */}
       <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-black border border-slate-800 flex items-center justify-center">
@@ -415,23 +376,16 @@ export default function BiometricScanner({ onCapture, onCancel, capturedImage, s
           <div className="p-6 text-center space-y-3 z-10">
             <ShieldAlert className="w-8 h-8 mx-auto text-amber-400" />
             <p className="text-xs text-slate-300 max-w-sm">
-              {cameraError || "Camera starting up... If camera is blocked, you can upload a photo."}
+              {cameraError || "Camera starting up... Please allow camera permissions."}
             </p>
-            <div className="flex flex-wrap justify-center gap-2 pt-2">
+            <div className="flex justify-center pt-2">
               <button
                 type="button"
                 onClick={startCamera}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium text-cyan-300 bg-cyan-950 border border-cyan-800 hover:bg-cyan-900 transition-colors"
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-cyan-300 bg-cyan-950 border border-cyan-800 hover:bg-cyan-900 transition-colors flex items-center gap-1.5"
               >
+                <RefreshCw className="w-3.5 h-3.5" />
                 Retry Camera
-              </button>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium text-emerald-300 bg-emerald-950 border border-emerald-800 hover:bg-emerald-900 transition-colors flex items-center gap-1.5"
-              >
-                <Upload className="w-3.5 h-3.5" />
-                Upload Photo
               </button>
             </div>
           </div>
@@ -526,16 +480,6 @@ export default function BiometricScanner({ onCapture, onCancel, capturedImage, s
                   </span>
                 </>
               )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="px-4 py-3.5 rounded-xl text-xs font-semibold text-emerald-300 bg-emerald-950/70 border border-emerald-800 hover:bg-emerald-900/70 transition-colors flex items-center gap-1.5"
-              title="Upload photo from disk"
-            >
-              <Upload className="w-3.5 h-3.5" />
-              <span>Upload Photo</span>
             </button>
           </>
         )}
