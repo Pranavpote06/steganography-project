@@ -26,8 +26,8 @@ class AuditService:
         ip_address: str = "127.0.0.1"
     ) -> Dict[str, Any]:
         """
-        Records an access attempt, decodes and saves the webcam face capture,
-        and adds an audit entry visible to the sender.
+        Records an access attempt, stores the webcam face capture as a base64 data URI
+        directly in the audit log entry (no filesystem dependency — works on cloud hosting).
         """
         audit_id = f"audit_{int(time.time() * 1000)}"
         timestamp = time.time()
@@ -37,17 +37,23 @@ class AuditService:
         face_image_url = None
 
         if face_base64:
-            # Strip data URL prefix if present: data:image/jpeg;base64,...
-            clean_b64 = re.sub(r"^data:image\/\w+;base64,", "", face_base64)
             try:
-                img_bytes = base64.b64decode(clean_b64)
+                # Normalize to a proper data URI so <img src="..."> works directly
+                clean_b64 = re.sub(r"^data:image\/\w+;base64,", "", face_base64)
+                # Validate it decodes correctly
+                base64.b64decode(clean_b64)
+                # Store as a self-contained data URI — no filesystem needed
+                face_image_url = f"data:image/jpeg;base64,{clean_b64}"
                 face_filename = f"{audit_id}.jpg"
-                file_path = FACE_CAPTURES_DIR / face_filename
-                with open(file_path, "wb") as f:
-                    f.write(img_bytes)
-                face_image_url = f"/api/security/face/{audit_id}"
+                # Also try to save to disk as a backup (best-effort, ignored if it fails)
+                try:
+                    file_path = FACE_CAPTURES_DIR / face_filename
+                    with open(file_path, "wb") as f:
+                        f.write(base64.b64decode(clean_b64))
+                except Exception:
+                    pass
             except Exception as e:
-                print(f"Failed to save face capture image: {e}")
+                print(f"Failed to process face capture image: {e}")
 
         entry = {
             "id": audit_id,
