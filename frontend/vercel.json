@@ -4,7 +4,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://appears-rocket-october-sir.trycloudflare.com/api/:path*"
+      "destination": "https://steganography-backend-z5t6.onrender.com/api/:path*"
     },
     {
       "source": "/(.*)",
