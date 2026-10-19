@@ -156,10 +156,24 @@ export default function ExtractData({ showToast, onOperationComplete }) {
     }
   };
 
-  const handleCopyText = () => {
-    if (extractedResult?.text) {
-      navigator.clipboard.writeText(extractedResult.text);
+  const handleCopyText = async () => {
+    if (!extractedResult?.text) return;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(extractedResult.text);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = extractedResult.text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
       showToast({ type: 'success', title: 'Copied to Clipboard', message: 'Recovered secret text copied.' });
+    } catch {
+      showToast({ type: 'warning', title: 'Copy Notice', message: 'Please select and copy the text manually.' });
     }
   };
 
@@ -177,10 +191,14 @@ export default function ExtractData({ showToast, onOperationComplete }) {
       const link = document.createElement('a');
       link.href = url;
       link.download = extractedResult.filename || 'recovered_file.bin';
+      link.rel = 'noopener noreferrer';
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      // On Safari/macOS, revoking immediately cancels the download!
+      setTimeout(() => {
+        if (link.parentNode) document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }, 30000);
       showToast({ type: 'success', title: 'Download Started', message: `Downloading ${extractedResult.filename}` });
     } catch {
       showToast({ type: 'error', title: 'Download Error', message: 'Failed to reconstruct file from payload.' });

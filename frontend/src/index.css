@@ -6,6 +6,9 @@
   body {
     @apply bg-[#07090e] text-slate-100 font-sans antialiased selection:bg-cyan-500 selection:text-black;
     overflow-x: hidden;
+    /* Safari font rendering */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 
@@ -31,4 +34,45 @@
   background-image: 
     linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+}
+
+/* ─── animate-fade-in ───────────────────────────────────────────────────────
+   Used across all JSX pages. Must be defined here because Tailwind cannot
+   generate arbitrary keyframe animations — Safari will show nothing without it.
+   ─────────────────────────────────────────────────────────────────────────── */
+@-webkit-keyframes fadeIn {
+  from { opacity: 0; -webkit-transform: translateY(6px); transform: translateY(6px); }
+  to   { opacity: 1; -webkit-transform: translateY(0);   transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  -webkit-animation: fadeIn 0.25s ease-out both;
+  animation: fadeIn 0.25s ease-out both;
+}
+
+/* ─── Safari: backdrop-blur vendor prefix ───────────────────────────────── */
+.backdrop-blur-md {
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+.backdrop-blur-sm {
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+/* ─── Safari: video element — disable system controls overlay ───────────── */
+video::-webkit-media-controls {
+  display: none !important;
+}
+video::-webkit-media-controls-enclosure {
+  display: none !important;
+}
+
+/* ─── Safari: transform utilities (mirror / flip) ───────────────────────── */
+.-scale-x-100 {
+  -webkit-transform: scaleX(-1);
+  transform: scaleX(-1);
 }

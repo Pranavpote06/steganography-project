@@ -57,8 +57,9 @@ export default function BiometricScanner({ onCapture, onCancel, capturedImage, s
     });
 
     try {
+      // Check API support (Safari 11+ and all modern browsers)
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("Camera API is not supported in this browser.");
+        throw new Error("Camera API not supported. Please use Chrome, Firefox, or Safari 11+.");
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -72,22 +73,48 @@ export default function BiometricScanner({ onCapture, onCancel, capturedImage, s
 
       streamRef.current = stream;
       if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.onloadedmetadata = async () => {
-          try {
-            await videoRef.current.play();
-            setCameraActive(true);
-            setTrackingStatus('NO_FACE');
-            setTrackingMessage('Position your face clearly in the camera frame.');
-          } catch (e) {
-            console.warn("Autoplay error:", e);
+        const video = videoRef.current;
+        video.srcObject = stream;
+
+        const handleReady = () => {
+          const playPromise = video.play();
+          if (playPromise !== undefined) {
+            playPromise
+              .then(() => {
+                setCameraActive(true);
+                setTrackingStatus('NO_FACE');
+                setTrackingMessage('Position your face clearly in the camera frame.');
+              })
+              .catch((e) => {
+                console.warn("Autoplay blocked:", e);
+                setCameraActive(true);
+                setTrackingStatus('NO_FACE');
+                setTrackingMessage('Tap camera area to activate, then position your face.');
+              });
+          } else {
             setCameraActive(true);
           }
+        };
+
+        video.onloadedmetadata = handleReady;
+        video.oncanplay = () => {
+          if (!cameraActive) handleReady();
         };
       }
     } catch (err) {
       console.warn("Webcam access error:", err);
-      setCameraError(err.message || "Camera access denied. Please allow camera permissions to continue.");
+      // Provide Mac-specific helpful error messages
+      let msg = err.message || "Camera access denied.";
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        msg = "Camera access denied. On Mac: go to System Settings → Privacy & Security → Camera → enable access for your browser.";
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        msg = "No camera found. Please connect a camera and try again.";
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        msg = "Camera is in use by another app. Close other apps using the camera and try again.";
+      } else if (err.name === 'OverconstrainedError') {
+        msg = "Camera does not meet requirements. Try a different camera.";
+      }
+      setCameraError(msg);
       setCameraActive(false);
     }
   };
@@ -107,20 +134,28 @@ export default function BiometricScanner({ onCapture, onCancel, capturedImage, s
   // Real-time frame analysis
   const checkCurrentFrame = useCallback(async () => {
     const video = videoRef.current;
-    if (!video || !cameraActive || isCheckingRef.current || video.readyState < 2) {
+    if (
+      !video || 
+      !cameraActive || 
+      isCheckingRef.current || 
+      video.readyState < 2 || 
+      !video.videoWidth || 
+      !video.videoHeight
+    ) {
       return;
     }
 
     try {
       isCheckingRef.current = true;
-      const vw = video.videoWidth || 320;
-      const vh = video.videoHeight || 240;
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
 
       // Downsample frame for fast, low-latency tracking
       const canvas = document.createElement('canvas');
       canvas.width = 360;
       canvas.height = Math.round(360 * (vh / vw));
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (!ctx) return;
       ctx.translate(canvas.width, 0);
       ctx.scale(-1, 1);
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -205,7 +240,7 @@ export default function BiometricScanner({ onCapture, onCancel, capturedImage, s
   // Capture Photo with strict server-side validation
   const handleCapturePhoto = async () => {
     const video = videoRef.current;
-    if (!video || !cameraActive || !isFaceReady) return;
+    if (!video || !cameraActive || !isFaceReady || !video.videoWidth || !video.videoHeight) return;
 
     setIsScanning(true);
     setFlash(true);
@@ -217,7 +252,8 @@ export default function BiometricScanner({ onCapture, onCancel, capturedImage, s
       const canvas = document.createElement('canvas');
       canvas.width = width;
       canvas.height = height;
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (!ctx) throw new Error("Could not create canvas context.");
       ctx.translate(canvas.width, 0);
       ctx.scale(-1, 1);
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -288,7 +324,14 @@ export default function BiometricScanner({ onCapture, onCancel, capturedImage, s
       </div>
 
       {/* Camera Viewport / Captured Preview */}
-      <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-black border border-slate-800 flex items-center justify-center">
+      <div 
+        onClick={() => {
+          if (videoRef.current && videoRef.current.paused) {
+            videoRef.current.play().then(() => setCameraActive(true)).catch(() => {});
+          }
+        }}
+        className="relative w-full aspect-video rounded-xl overflow-hidden bg-black border border-slate-800 flex items-center justify-center cursor-pointer"
+      >
         {flash && (
           <div className="absolute inset-0 bg-white z-30 transition-opacity duration-150" />
         )}
@@ -298,9 +341,11 @@ export default function BiometricScanner({ onCapture, onCancel, capturedImage, s
           autoPlay
           playsInline
           muted
-          className={`w-full h-full object-cover transform -scale-x-100 ${
-            !capturedImage && cameraActive ? 'block' : 'hidden'
-          }`}
+          // @ts-ignore
+          webkit-playsinline="true"
+          className={`w-full h-full object-cover transform -scale-x-100 transition-opacity duration-300 ${
+            capturedImage ? 'hidden' : 'block'
+          } ${cameraActive ? 'opacity-100' : 'opacity-0'}`}
         />
 
         {/* Captured Image Display */}

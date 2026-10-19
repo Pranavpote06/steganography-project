@@ -228,4 +228,38 @@ export const detectFace = async (faceFrame) => {
   return res.data;
 };
 
+/**
+ * Universal cross-platform media downloader (Mac/Safari/iOS/Windows/Linux).
+ * Bypasses cross-origin <a download> restrictions in Safari by fetching as blob.
+ */
+export const downloadMediaFile = async (url, filename) => {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = filename;
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => {
+      if (link.parentNode) document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    }, 30000);
+  } catch (err) {
+    console.warn("Direct blob download failed, falling back to window navigation:", err);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => {
+      if (link.parentNode) document.body.removeChild(link);
+    }, 1000);
+  }
+};
+
 export default api;

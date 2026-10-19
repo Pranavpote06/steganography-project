@@ -202,14 +202,39 @@ export default function AuditLogs({ showToast }) {
             </div>
 
             <div className="flex justify-end gap-2">
-              <a
-                href={selectedImage}
-                download="recipient_face_capture.jpg"
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-900 bg-cyan-400 hover:bg-cyan-300 transition-colors flex items-center gap-1.5"
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    if (selectedImage.startsWith('data:')) {
+                      const parts = selectedImage.split(',');
+                      const mime = parts[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+                      const b64 = atob(parts[1]);
+                      const arr = new Uint8Array(b64.length);
+                      for (let i = 0; i < b64.length; i++) arr[i] = b64.charCodeAt(i);
+                      const blob = new Blob([arr], { type: mime });
+                      const blobUrl = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = blobUrl;
+                      a.download = 'recipient_face_capture.jpg';
+                      document.body.appendChild(a);
+                      a.click();
+                      setTimeout(() => {
+                        if (a.parentNode) document.body.removeChild(a);
+                        URL.revokeObjectURL(blobUrl);
+                      }, 30000);
+                    } else {
+                      window.open(selectedImage, '_blank');
+                    }
+                  } catch {
+                    window.open(selectedImage, '_blank');
+                  }
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-900 bg-cyan-400 hover:bg-cyan-300 transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <Download className="w-4 h-4" />
                 <span>Download Photo</span>
-              </a>
+              </button>
               <button
                 onClick={() => setSelectedImage(null)}
                 className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 bg-slate-900 hover:bg-slate-800 transition-colors"

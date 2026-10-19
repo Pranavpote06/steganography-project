@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import FileDropzone from '../components/FileDropzone';
 import CapacityMeter from '../components/CapacityMeter';
-import { getAudioCapacity, embedAudio, API_BASE_URL } from '../api';
+import { getAudioCapacity, embedAudio, downloadMediaFile, API_BASE_URL } from '../api';
 
 export default function AudioStego({ showToast, onOperationComplete }) {
   // Carrier State
@@ -503,14 +503,20 @@ export default function AudioStego({ showToast, onOperationComplete }) {
           </div>
 
           {/* Direct Download Button */}
-          <a
-            href={`${API_BASE_URL}/api/audio/download/${stegoResult.download_id}`}
-            download={stegoResult.filename}
-            className="w-full py-4 rounded-xl text-sm font-bold text-slate-900 bg-cyan-400 hover:bg-cyan-300 shadow-glow-cyan transition-all flex items-center justify-center gap-2"
+          <button
+            type="button"
+            onClick={() => {
+              downloadMediaFile(
+                `${API_BASE_URL}/api/audio/download/${stegoResult.download_id}`,
+                stegoResult.filename || 'stego_audio.wav'
+              );
+              showToast({ type: 'info', title: 'Downloading', message: `Downloading ${stegoResult.filename}...` });
+            }}
+            className="w-full py-4 rounded-xl text-sm font-bold text-slate-900 bg-cyan-400 hover:bg-cyan-300 shadow-glow-cyan transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
             <Download className="w-4 h-4" />
             <span>Download Stego WAV File ({stegoResult.filename})</span>
-          </a>
+          </button>
         </div>
       )}
     </div>

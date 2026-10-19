@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import FileDropzone from '../components/FileDropzone';
 import CapacityMeter from '../components/CapacityMeter';
-import { getVideoCapacity, embedVideo, API_BASE_URL } from '../api';
+import { getVideoCapacity, embedVideo, downloadMediaFile, API_BASE_URL } from '../api';
 
 export default function VideoStego({ showToast, onOperationComplete }) {
   // Carrier State
@@ -498,14 +498,20 @@ export default function VideoStego({ showToast, onOperationComplete }) {
           </div>
 
           {/* Direct Download Button */}
-          <a
-            href={`${API_BASE_URL}/api/video/download/${stegoResult.download_id}`}
-            download={stegoResult.filename}
-            className="w-full py-4 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 shadow-glow-purple transition-all flex items-center justify-center gap-2"
+          <button
+            type="button"
+            onClick={() => {
+              downloadMediaFile(
+                `${API_BASE_URL}/api/video/download/${stegoResult.download_id}`,
+                stegoResult.filename || 'stego_video.mp4'
+              );
+              showToast({ type: 'info', title: 'Downloading', message: `Downloading ${stegoResult.filename}...` });
+            }}
+            className="w-full py-4 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 shadow-glow-purple transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
             <Download className="w-4 h-4" />
             <span>Download Stego MP4 Video ({stegoResult.filename})</span>
-          </a>
+          </button>
         </div>
       )}
     </div>
