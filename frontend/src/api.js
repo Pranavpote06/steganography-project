@@ -4,8 +4,30 @@ export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\
 
 const api = axios.create({
   baseURL: `${API_BASE_URL}/api`,
-  timeout: 120000,
+  timeout: 180000,
 });
+
+// Auto-retry interceptor for cloud hosting cold-starts (502 / 503 / 504 / network timeout)
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const config = error.config;
+    if (!config) return Promise.reject(error);
+
+    config.__retryCount = config.__retryCount || 0;
+    const status = error.response ? error.response.status : null;
+    const isColdStart = status === 502 || status === 503 || status === 504;
+    const isNetwork = !error.response && error.code !== 'ECONNABORTED';
+
+    if ((isColdStart || isNetwork) && config.__retryCount < 2) {
+      config.__retryCount += 1;
+      // Wait 3 seconds for container boot before retrying
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      return api(config);
+    }
+    return Promise.reject(error);
+  }
+);
 
 export const getHealth = async () => {
   const res = await api.get('/health');
@@ -230,35 +252,23 @@ export const detectFace = async (faceFrame) => {
 
 /**
  * Universal cross-platform media downloader (Mac/Safari/iOS/Windows/Linux).
- * Bypasses cross-origin <a download> restrictions in Safari by fetching as blob.
+ * Directly invokes the browser's streaming download manager via attachment response,
+ * falling back to blob fetching if needed.
  */
-export const downloadMediaFile = async (url, filename) => {
+export const downloadMediaFile = (url, filename) => {
   try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-    const blob = await res.blob();
-    const blobUrl = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = blobUrl;
-    link.download = filename;
-    link.rel = 'noopener noreferrer';
-    document.body.appendChild(link);
-    link.click();
-    setTimeout(() => {
-      if (link.parentNode) document.body.removeChild(link);
-      URL.revokeObjectURL(blobUrl);
-    }, 30000);
-  } catch (err) {
-    console.warn("Direct blob download failed, falling back to window navigation:", err);
     const link = document.createElement('a');
     link.href = url;
-    link.download = filename;
-    link.target = '_blank';
+    link.setAttribute('download', filename || 'stego_media.bin');
+    link.setAttribute('target', '_blank');
+    link.setAttribute('rel', 'noopener noreferrer');
     document.body.appendChild(link);
     link.click();
     setTimeout(() => {
       if (link.parentNode) document.body.removeChild(link);
-    }, 1000);
+    }, 1500);
+  } catch {
+    window.open(url, '_blank');
   }
 };
 

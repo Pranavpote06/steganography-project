@@ -68,6 +68,15 @@ export default function VideoStego({ showToast, onOperationComplete }) {
       return;
     }
 
+    if (file.size > 100 * 1024 * 1024) {
+      showToast({
+        type: 'error',
+        title: 'File Too Large',
+        message: `Video size is ${(file.size / (1024 * 1024)).toFixed(1)} MB. Maximum allowed carrier size is 100MB. Please use a shorter clip.`
+      });
+      return;
+    }
+
     setCarrierFile(file);
     setCarrierVideoUrl(URL.createObjectURL(file));
     setStegoResult(null);
@@ -440,7 +449,11 @@ export default function VideoStego({ showToast, onOperationComplete }) {
             {isEmbedding ? (
               <>
                 <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                <span>Processing Video Frames ({uploadProgress}%)...</span>
+                <span>
+                  {uploadProgress < 100
+                    ? `Uploading Carrier Video (${uploadProgress}%)...`
+                    : 'Encoding & Securing Video Frames (please wait)...'}
+                </span>
               </>
             ) : (
               <>
@@ -535,6 +548,20 @@ export default function VideoStego({ showToast, onOperationComplete }) {
             <Download className="w-4 h-4" />
             <span>Download Stego MP4 Video ({stegoResult.filename})</span>
           </button>
+
+          {/* Fallback Direct Link */}
+          <div className="text-center pt-1">
+            <a
+              href={`${API_BASE_URL}/api/video/download/${stegoResult.download_id}`}
+              download={stegoResult.filename || 'stego_video.mp4'}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-mono text-cyan-400 hover:text-cyan-300 underline underline-offset-4 inline-flex items-center gap-1.5 transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Direct download link (fallback)
+            </a>
+          </div>
         </div>
       )}
     </div>

@@ -517,6 +517,20 @@ export default function AudioStego({ showToast, onOperationComplete }) {
             <Download className="w-4 h-4" />
             <span>Download Stego WAV File ({stegoResult.filename})</span>
           </button>
+
+          {/* Fallback Direct Link */}
+          <div className="text-center pt-1">
+            <a
+              href={`${API_BASE_URL}/api/audio/download/${stegoResult.download_id}`}
+              download={stegoResult.filename || 'stego_audio.wav'}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-mono text-cyan-400 hover:text-cyan-300 underline underline-offset-4 inline-flex items-center gap-1.5 transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Direct download link (fallback)
+            </a>
+          </div>
         </div>
       )}
     </div>
