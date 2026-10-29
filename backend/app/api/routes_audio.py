@@ -2,6 +2,7 @@ import os
 import uuid
 import base64
 import tempfile
+import asyncio
 from pathlib import Path
 from typing import Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
@@ -44,7 +45,7 @@ async def audio_capacity(audio_file: UploadFile = File(...)):
         with open(temp_path, "wb") as f:
             f.write(content)
 
-        info = get_audio_info(str(temp_path))
+        info = await asyncio.to_thread(get_audio_info, str(temp_path))
         info["filename"] = audio_file.filename
         info["file_size_bytes"] = len(content)
         return info
@@ -105,8 +106,9 @@ async def audio_embed(
             f.write(audio_bytes)
 
 
-        # 3. Perform embedding
-        result = embed_audio_data(
+        # 3. Perform embedding in worker thread
+        result = await asyncio.to_thread(
+            embed_audio_data,
             input_path=str(input_audio_path),
             output_path=str(output_audio_path),
             raw_payload=raw_payload,
@@ -192,7 +194,8 @@ async def audio_extract(
             f.write(content)
 
 
-        stego_data = extract_audio_data(
+        stego_data = await asyncio.to_thread(
+            extract_audio_data,
             str(temp_path),
             password=password.strip() if password else None,
             recipient_phone=recipient_phone.strip() if recipient_phone else None

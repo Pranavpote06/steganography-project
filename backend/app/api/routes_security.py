@@ -1,6 +1,7 @@
 import os
 import uuid
 import base64
+import asyncio
 from pathlib import Path
 from typing import Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
@@ -50,9 +51,9 @@ async def inspect_carrier(carrier_file: UploadFile = File(...)):
             f.write(content)
 
         if is_audio:
-            info = inspect_audio_carrier(str(temp_path))
+            info = await asyncio.to_thread(inspect_audio_carrier, str(temp_path))
         else:
-            info = inspect_video_carrier(str(temp_path))
+            info = await asyncio.to_thread(inspect_video_carrier, str(temp_path))
 
         info["filename"] = carrier_file.filename
         info["media_type"] = "audio" if is_audio else "video"
@@ -207,9 +208,9 @@ async def verify_and_extract(
 
         clean_phone = normalize_phone(phone) if phone else None
         if is_audio:
-            stego_data = extract_audio_data(str(temp_path), password=password, recipient_phone=clean_phone)
+            stego_data = await asyncio.to_thread(extract_audio_data, str(temp_path), password=password, recipient_phone=clean_phone)
         else:
-            stego_data = extract_video_data(str(temp_path), password=password, recipient_phone=clean_phone)
+            stego_data = await asyncio.to_thread(extract_video_data, str(temp_path), password=password, recipient_phone=clean_phone)
 
         payload_name = stego_data.filename if stego_data.is_file else "Secret Text Payload"
         payload_type = "file" if stego_data.is_file else "text"

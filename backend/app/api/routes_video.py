@@ -1,6 +1,7 @@
 import os
 import uuid
 import base64
+import asyncio
 from pathlib import Path
 from typing import Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
@@ -44,7 +45,7 @@ async def video_capacity(video_file: UploadFile = File(...)):
         with open(temp_path, "wb") as f:
             f.write(content)
 
-        info = get_video_info(str(temp_path))
+        info = await asyncio.to_thread(get_video_info, str(temp_path))
         info["filename"] = video_file.filename
         info["file_size_bytes"] = len(content)
         return info
@@ -103,8 +104,9 @@ async def video_embed(
         with open(input_video_path, "wb") as f:
             f.write(video_bytes)
 
-        # 3. Perform embedding
-        result = embed_video_data(
+        # 3. Perform embedding in a background thread to prevent blocking event loop
+        result = await asyncio.to_thread(
+            embed_video_data,
             input_path=str(input_video_path),
             output_path=str(output_video_path),
             raw_payload=raw_payload,
@@ -159,12 +161,18 @@ async def video_embed(
         cleanup_file(str(input_video_path))
 
 @router.get("/download/{download_id}")
-async def download_video_file(download_id: str):
+async def download_video_file(download_id: str, inline: bool = False):
     """Downloads the generated steganographic MP4 video file."""
     file_path = TEMP_DIR / f"stego_{download_id}.mp4"
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Requested stego video file not found or has expired.")
 
+    if inline:
+        return FileResponse(
+            path=str(file_path),
+            media_type="video/mp4",
+            content_disposition_type="inline"
+        )
     return FileResponse(
         path=str(file_path),
         media_type="video/mp4",
@@ -187,7 +195,8 @@ async def video_extract(
         with open(temp_path, "wb") as f:
             f.write(content)
 
-        stego_data = extract_video_data(
+        stego_data = await asyncio.to_thread(
+            extract_video_data,
             str(temp_path),
             password=password.strip() if password else None,
             recipient_phone=recipient_phone.strip() if recipient_phone else None

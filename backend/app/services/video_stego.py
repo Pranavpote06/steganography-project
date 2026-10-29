@@ -216,6 +216,7 @@ def embed_video_data(
 
     ffmpeg_cmd = [
         FFMPEG_PATH, "-y",
+        "-loglevel", "error",
         "-f", "rawvideo",
         "-vcodec", "rawvideo",
         "-s", f"{width}x{height}",
@@ -319,7 +320,6 @@ def extract_video_data(
         raise VideoStegoError("Could not open video file.")
 
     header_bits_needed = HEADER_SIZE * 8
-    collected_bits = []
 
     ret, frame = cap.read()
     if not ret or frame is None:
@@ -349,8 +349,9 @@ def extract_video_data(
 
     total_bits_needed = total_bytes_needed * 8
 
+    all_bits = np.empty(total_bits_needed, dtype=np.uint8)
     first_frame_take = min(flat.size, total_bits_needed)
-    collected_bits.append(flat[:first_frame_take] & 1)
+    all_bits[:first_frame_take] = flat[:first_frame_take] & 1
     bits_collected_count = first_frame_take
 
     while bits_collected_count < total_bits_needed:
@@ -360,7 +361,7 @@ def extract_video_data(
         flat_f = frame.ravel()
         needed = total_bits_needed - bits_collected_count
         take = min(flat_f.size, needed)
-        collected_bits.append(flat_f[:take] & 1)
+        all_bits[bits_collected_count : bits_collected_count + take] = flat_f[:take] & 1
         bits_collected_count += take
 
     cap.release()
@@ -368,7 +369,6 @@ def extract_video_data(
     if bits_collected_count < total_bits_needed:
         raise VideoStegoError("Corrupted or incomplete steganographic video data.")
 
-    all_bits = np.concatenate(collected_bits)
     packed_data = bits_to_bytes(all_bits)
 
     return unpack_payload(packed_data, password=password, recipient_phone=recipient_phone)
