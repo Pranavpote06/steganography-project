@@ -68,11 +68,11 @@ export default function VideoStego({ showToast, onOperationComplete }) {
       return;
     }
 
-    if (file.size > 100 * 1024 * 1024) {
+    if (file.size > 50 * 1024 * 1024) {
       showToast({
         type: 'error',
         title: 'File Too Large',
-        message: `Video size is ${(file.size / (1024 * 1024)).toFixed(1)} MB. Maximum allowed carrier size is 100MB. Please use a shorter clip.`
+        message: `Video size is ${(file.size / (1024 * 1024)).toFixed(1)} MB. Maximum allowed carrier size is 50MB. Please use a shorter video clip.`
       });
       return;
     }
@@ -173,7 +173,7 @@ export default function VideoStego({ showToast, onOperationComplete }) {
       setSecretText('');
       setSecretFile(null);
       setPassword('');
-      setUsePassword(false);
+      setSecurityMode('face_scan');
       setStegoResult(null);
     }
   };

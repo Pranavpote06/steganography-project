@@ -84,7 +84,6 @@ export const embedAudio = async ({
   }
 
   const res = await api.post('/audio/embed', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
     onUploadProgress: (progressEvent) => {
       if (onProgress && progressEvent.total) {
         const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
@@ -148,7 +147,6 @@ export const embedVideo = async ({
   }
 
   const res = await api.post('/video/embed', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
     onUploadProgress: (progressEvent) => {
       if (onProgress && progressEvent.total) {
         const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
@@ -252,23 +250,34 @@ export const detectFace = async (faceFrame) => {
 
 /**
  * Universal cross-platform media downloader (Mac/Safari/iOS/Windows/Linux).
- * Directly invokes the browser's streaming download manager via attachment response,
- * falling back to blob fetching if needed.
+ * Fetches the resource and generates a local Blob URL for reliable, native save-to-disk
+ * across all browsers, preventing empty tabs and black-screen media preview issues.
  */
-export const downloadMediaFile = (url, filename) => {
+export const downloadMediaFile = async (url, filename) => {
   try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP error ${response.status}`);
+    const blob = await response.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = filename || 'stego_media.bin';
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => {
+      if (link.parentNode) document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    }, 1500);
+  } catch (err) {
+    console.warn('Blob fetch failed, falling back to direct navigation:', err);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', filename || 'stego_media.bin');
-    link.setAttribute('target', '_blank');
-    link.setAttribute('rel', 'noopener noreferrer');
+    link.download = filename || 'stego_media.bin';
     document.body.appendChild(link);
     link.click();
     setTimeout(() => {
       if (link.parentNode) document.body.removeChild(link);
     }, 1500);
-  } catch {
-    window.open(url, '_blank');
   }
 };
 
