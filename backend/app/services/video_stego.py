@@ -245,9 +245,14 @@ def embed_video_data(
         "-c:v", "libx264rgb",
         "-crf", "0",
         "-preset", "ultrafast",
+        "-threads", "1",
+        "-x264-params", "threads=1:lookahead=5:sliced-threads=0",
         "-shortest",
         output_path
     ])
+
+    import gc
+    gc.collect()
 
     cap = cv2.VideoCapture(input_path)
     proc = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)

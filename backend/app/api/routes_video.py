@@ -39,15 +39,17 @@ async def video_capacity(video_file: UploadFile = File(...)):
 
     temp_path = TEMP_DIR / f"cap_vid_{uuid.uuid4().hex}{ext}"
     try:
-        content = await video_file.read()
-        if len(content) > MAX_UPLOAD_SIZE:
-            raise HTTPException(status_code=400, detail=f"File exceeds maximum upload size of {MAX_UPLOAD_SIZE // (1024*1024)}MB.")
+        total_size = 0
         with open(temp_path, "wb") as f:
-            f.write(content)
+            while chunk := await video_file.read(65536):
+                total_size += len(chunk)
+                if total_size > MAX_UPLOAD_SIZE:
+                    raise HTTPException(status_code=400, detail=f"File exceeds maximum upload size of {MAX_UPLOAD_SIZE // (1024*1024)}MB.")
+                f.write(chunk)
 
         info = await asyncio.to_thread(get_video_info, str(temp_path))
         info["filename"] = video_file.filename
-        info["file_size_bytes"] = len(content)
+        info["file_size_bytes"] = total_size
         return info
     except VideoStegoError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -98,11 +100,13 @@ async def video_embed(
     output_video_path = TEMP_DIR / f"stego_{unique_id}.mp4"
 
     try:
-        video_bytes = await video_file.read()
-        if len(video_bytes) > MAX_UPLOAD_SIZE:
-            raise HTTPException(status_code=400, detail="Carrier video file exceeds upload limit.")
+        total_uploaded = 0
         with open(input_video_path, "wb") as f:
-            f.write(video_bytes)
+            while chunk := await video_file.read(65536):
+                total_uploaded += len(chunk)
+                if total_uploaded > MAX_UPLOAD_SIZE:
+                    raise HTTPException(status_code=400, detail="Carrier video file exceeds upload limit.")
+                f.write(chunk)
 
         # 3. Perform embedding in a background thread to prevent blocking event loop
         result = await asyncio.to_thread(
@@ -189,11 +193,13 @@ async def video_extract(
     ext = Path(video_file.filename).suffix.lower()
     temp_path = TEMP_DIR / f"ext_vid_{uuid.uuid4().hex}{ext}"
     try:
-        content = await video_file.read()
-        if len(content) > MAX_UPLOAD_SIZE:
-            raise HTTPException(status_code=400, detail="Video file exceeds upload limit.")
+        total_size = 0
         with open(temp_path, "wb") as f:
-            f.write(content)
+            while chunk := await video_file.read(65536):
+                total_size += len(chunk)
+                if total_size > MAX_UPLOAD_SIZE:
+                    raise HTTPException(status_code=400, detail="Video file exceeds upload limit.")
+                f.write(chunk)
 
         stego_data = await asyncio.to_thread(
             extract_video_data,
