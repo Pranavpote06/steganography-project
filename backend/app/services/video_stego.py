@@ -199,21 +199,6 @@ def embed_video_data(
     bits_embedded = 0
     total_bits = len(payload_bits)
 
-    temp_audio_file = None
-    if has_audio:
-        fd, temp_audio_file = tempfile.mkstemp(suffix=".aac")
-        os.close(fd)
-        audio_extract_cmd = [FFMPEG_PATH, "-y", "-i", input_path, "-vn", "-c:a", "copy", temp_audio_file]
-        res = subprocess.run(audio_extract_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-        if res.returncode != 0 or os.path.getsize(temp_audio_file) == 0:
-            os.remove(temp_audio_file)
-            fd, temp_audio_file = tempfile.mkstemp(suffix=".wav")
-            os.close(fd)
-            subprocess.run([FFMPEG_PATH, "-y", "-i", input_path, "-vn", "-c:a", "pcm_s16le", temp_audio_file],
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            if not os.path.exists(temp_audio_file) or os.path.getsize(temp_audio_file) == 0:
-                temp_audio_file = None
-
     # Optimize frames to encode:
     # Large or long carrier videos (e.g. 50s-10min) can take minutes and cause gateway timeouts.
     # We dynamically calculate frames needed for payload plus buffer (up to 8 seconds / ~200 frames).
@@ -226,6 +211,32 @@ def embed_video_data(
     )
     # Ensure all frames needed for payload are strictly encoded
     max_frames_to_encode = min(total_frames, max(frames_needed_for_payload, max_frames_to_encode))
+    target_duration_sec = round(max_frames_to_encode / fps, 2) if fps > 0 else 8.0
+
+    temp_audio_file = None
+    if has_audio:
+        fd, temp_audio_file = tempfile.mkstemp(suffix=".aac")
+        os.close(fd)
+        audio_extract_cmd = [
+            FFMPEG_PATH, "-y", "-i", input_path,
+            "-t", str(target_duration_sec),
+            "-vn", "-c:a", "copy", temp_audio_file
+        ]
+        res = subprocess.run(audio_extract_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        if res.returncode != 0 or os.path.getsize(temp_audio_file) < 512:
+            if os.path.exists(temp_audio_file):
+                os.remove(temp_audio_file)
+            fd, temp_audio_file = tempfile.mkstemp(suffix=".wav")
+            os.close(fd)
+            subprocess.run([
+                FFMPEG_PATH, "-y", "-i", input_path,
+                "-t", str(target_duration_sec),
+                "-vn", "-c:a", "pcm_s16le", temp_audio_file
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if not os.path.exists(temp_audio_file) or os.path.getsize(temp_audio_file) < 512:
+                if os.path.exists(temp_audio_file):
+                    os.remove(temp_audio_file)
+                temp_audio_file = None
 
     ffmpeg_cmd = [
         FFMPEG_PATH, "-y",
@@ -239,7 +250,9 @@ def embed_video_data(
     ]
 
     if temp_audio_file and os.path.exists(temp_audio_file):
-        ffmpeg_cmd.extend(["-i", temp_audio_file, "-c:a", "aac", "-b:a", "192k"])
+        ffmpeg_cmd.extend(["-i", temp_audio_file, "-map", "0:v:0", "-map", "1:a:0?", "-c:a", "aac", "-b:a", "192k"])
+    else:
+        ffmpeg_cmd.extend(["-map", "0:v:0"])
 
     ffmpeg_cmd.extend([
         "-c:v", "libx264rgb",
@@ -247,7 +260,7 @@ def embed_video_data(
         "-preset", "ultrafast",
         "-threads", "1",
         "-x264-params", "threads=1:lookahead=5:sliced-threads=0",
-        "-shortest",
+        "-movflags", "+faststart",
         output_path
     ])
 
@@ -302,7 +315,8 @@ def embed_video_data(
         ret, first_frame = verify_cap.read()
         verify_cap.release()
         if not ret or first_frame is None:
-            raise VideoStegoError("Generated video produced an empty first frame.")
+            fsize = os.path.getsize(output_path) if os.path.exists(output_path) else 0
+            raise VideoStegoError(f"Generated video produced an empty first frame (output file size: {fsize} bytes, frames written: {frames_written}).")
         first_bits = (first_frame.ravel()[:HEADER_SIZE * 8]) & 1
         header_bytes = bits_to_bytes(first_bits)
         if not header_bytes.startswith(MAGIC):
