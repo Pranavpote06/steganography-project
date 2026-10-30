@@ -214,6 +214,19 @@ def embed_video_data(
             if not os.path.exists(temp_audio_file) or os.path.getsize(temp_audio_file) == 0:
                 temp_audio_file = None
 
+    # Optimize frames to encode:
+    # Large or long carrier videos (e.g. 50s-10min) can take minutes and cause gateway timeouts.
+    # We dynamically calculate frames needed for payload plus buffer (up to 8 seconds / ~200 frames).
+    bits_per_frame = width * height * 3
+    frames_needed_for_payload = int(np.ceil(total_bits / bits_per_frame)) if bits_per_frame > 0 else 1
+    target_buffer_frames = int(fps * 8) # 8-second standard playable carrier
+    max_frames_to_encode = min(
+        total_frames,
+        max(frames_needed_for_payload + int(fps * 2), target_buffer_frames)
+    )
+    # Ensure all frames needed for payload are strictly encoded
+    max_frames_to_encode = min(total_frames, max(frames_needed_for_payload, max_frames_to_encode))
+
     ffmpeg_cmd = [
         FFMPEG_PATH, "-y",
         "-loglevel", "error",
@@ -232,14 +245,16 @@ def embed_video_data(
         "-c:v", "libx264rgb",
         "-crf", "0",
         "-preset", "ultrafast",
+        "-shortest",
         output_path
     ])
 
     cap = cv2.VideoCapture(input_path)
     proc = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+    frames_written = 0
 
     try:
-        while True:
+        while frames_written < max_frames_to_encode:
             ret, frame = cap.read()
             if not ret or frame is None:
                 break
@@ -256,6 +271,7 @@ def embed_video_data(
                 frame = flat_frame.reshape(frame.shape)
 
             proc.stdin.write(frame.tobytes())
+            frames_written += 1
 
         proc.stdin.close()
         stderr_output = proc.stderr.read()
@@ -263,6 +279,9 @@ def embed_video_data(
 
         if proc.returncode != 0:
             raise VideoStegoError(f"FFmpeg encoding error: {stderr_output.decode('utf-8', errors='replace')}")
+
+        if bits_embedded < total_bits:
+            raise VideoInsufficientCapacityError("Failed to embed all secret bits into the video frames.")
 
     finally:
         cap.release()
@@ -294,7 +313,7 @@ def embed_video_data(
         "width": width,
         "height": height,
         "fps": fps,
-        "total_frames": total_frames,
+        "total_frames": frames_written,
         "payload_bytes": len(raw_payload),
         "envelope_bytes": required_bytes,
         "max_capacity_bytes": max_capacity_bytes,
